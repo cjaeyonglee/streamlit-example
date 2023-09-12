@@ -1,38 +1,56 @@
-from collections import namedtuple
-import altair as alt
-import math
-import pandas as pd
 import streamlit as st
+import plotly.graph_objects as go
+import pandas as pd
 
-"""
-# Welcome to Streamlit!
+# Streamlit app title
+st.title('Commodity Prices Over Time')
 
-Edit `/streamlit_app.py` to customize this app to your heart's desire :heart:
+# Use Streamlit's file uploader to select the data file
+uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
 
-If you have any questions, checkout our [documentation](https://docs.streamlit.io) and [community
-forums](https://discuss.streamlit.io).
+# Parse and load data into a Pandas DataFrame
+if uploaded_file is not None:
+    data = pd.read_csv(uploaded_file)
+    st.write("Data Preview:")
+    st.write(data.head())
 
-In the meantime, below is an example of what you can do with just a few lines of code:
-"""
+    # Convert 'Date' to datetime if not already
+    data['Date'] = pd.to_datetime(data['Date'])
 
+    # Get the unique symbols (commodities)
+    symbols = data['Symbol'].unique()
 
-with st.echo(code_location='below'):
-    total_points = st.slider("Number of points in spiral", 1, 5000, 2000)
-    num_turns = st.slider("Number of turns in spiral", 1, 100, 9)
+    # Create a Streamlit selectbox to choose the commodity
+    selected_symbol = st.selectbox('Choose a commodity to display', symbols)
 
-    Point = namedtuple('Point', 'x y')
-    data = []
+    # Extract the data for this symbol
+    symbol_data = data[data['Symbol'] == selected_symbol]
 
-    points_per_turn = total_points / num_turns
+    # Create a figure
+    fig = go.Figure()
 
-    for curr_point_num in range(total_points):
-        curr_turn, i = divmod(curr_point_num, points_per_turn)
-        angle = (curr_turn + 1) * 2 * math.pi * i / points_per_turn
-        radius = curr_point_num / total_points
-        x = radius * math.cos(angle)
-        y = radius * math.sin(angle)
-        data.append(Point(x, y))
+    # Add scatter plot
+    fig.add_trace(go.Scatter(x=symbol_data['Date'],
+                             y=symbol_data['Close'],
+                             mode='markers',
+                             name=selected_symbol))
 
-    st.altair_chart(alt.Chart(pd.DataFrame(data), height=500, width=500)
-        .mark_circle(color='#0068c9', opacity=0.5)
-        .encode(x='x:Q', y='y:Q'))
+    # Get the years in the data for this symbol
+    years = symbol_data['Date'].dt.year.unique()
+
+    # Update x-axis and y-axis labels
+    fig.update_xaxes(title_text="Date",
+                     tickvals=[f"{year}-01-01" for year in years],
+                     ticktext=[str(year) for year in years])
+    fig.update_yaxes(title_text="Close Price")
+
+    # Update layout
+    fig.update_layout(title=f'{selected_symbol} Prices Over Time',
+                      showlegend=False,
+                      margin=dict(t=50, b=50, l=50, r=50),
+                      title_font=dict(size=14),
+                      height=400,  # Height of each individual plot
+                      width=900)  # Width of each individual plot
+
+    # Use Streamlit to display the Plotly plot
+    st.plotly_chart(fig)
